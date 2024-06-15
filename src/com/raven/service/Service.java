@@ -72,18 +72,27 @@ public class Service {
             }
         });
         server.addEventListener("login", Model_Login.class, new DataListener<Model_Login>() {
-            @Override
-            public void onData(SocketIOClient sioc, Model_Login t, AckRequest ar) throws Exception {
-                Model_User_Account login = serviceUser.login(t);
-                if (login != null) {
-                    ar.sendAckData(true, login);
-                    addClient(sioc, login);
-                    userConnect(login.getUserID());
-                } else {
-                    ar.sendAckData(false);
-                }
-            }
-        });
+    @Override
+    public void onData(SocketIOClient sioc, Model_Login t, AckRequest ar) throws Exception {
+        Model_User_Account login = serviceUser.login(t);
+        if (login != null) {
+            ar.sendAckData(true, login);
+            addClient(sioc, login);
+            userConnect(login.getUserID());
+
+            int loggedInUserID = login.getUserID();
+List<Model_Receive_Message> chatHistory = serviceFile.getChatHistory(loggedInUserID, loggedInUserID);
+if (chatHistory != null && !chatHistory.isEmpty()) {
+    for (Model_Receive_Message message : chatHistory) {
+        sioc.sendEvent("receive_ms", message);
+    }
+}
+        } else {
+            ar.sendAckData(false);
+        }
+    }
+});
+
         server.addEventListener("list_user", Integer.class, new DataListener<Integer>() {
             @Override
             public void onData(SocketIOClient sioc, Integer userID, AckRequest ar) throws Exception {
@@ -168,7 +177,7 @@ public class Service {
         listClient.add(new Model_Client(client, user));
     }
     
-    private void sendToClient(Model_Send_Message data, AckRequest ar) {
+   private void sendToClient(Model_Send_Message data, AckRequest ar) {
         if (data.getMessageType() == MessageType.IMAGE.getValue() || data.getMessageType() == MessageType.FILE.getValue()) {
             try {
                 Model_File file = serviceFile.addFileReceiver(data.getText());
@@ -182,9 +191,15 @@ public class Service {
         } else {
             for (Model_Client c : listClient) {
                 if (c.getUser().getUserID() == data.getToUserID()) {
+                     String senderString = String.valueOf(data.getFromUserID());
+                String receiverString = String.valueOf(data.getToUserID());
+                    serviceFile.saveMessage(senderString, receiverString, data.getMessageType(), data.getText());
                     c.getClient().sendEvent("receive_ms", new Model_Receive_Message(data.getMessageType(), data.getFromUserID(), data.getText(), null));
-                    break;
+                                 
+//                    c.getClient().sendEvent("receive_ms", serviceFile.getMessages(senderString, receiverString));
+//                    break;
                 }
+                
             }
         }
     }

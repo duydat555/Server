@@ -7,6 +7,7 @@ import com.raven.model.Model_File_Receiver;
 import com.raven.model.Model_File_Sender;
 import com.raven.model.Model_Package_Sender;
 import com.raven.model.Model_Receive_Image;
+import com.raven.model.Model_Receive_Message;
 import com.raven.model.Model_Send_Message;
 import com.raven.swing.blurHash.BlurHash;
 import java.awt.Dimension;
@@ -18,7 +19,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 
@@ -132,7 +135,39 @@ public class ServiceFIle {
         dataImage.setImage(blurhash);
         return blurhash;
     }
-     
+     public void saveMessage(String sender, String receiver, int MessageType, String content) {
+    try {
+        
+        PreparedStatement p = con.prepareStatement(INSERTMESSAGE);
+        p.setString(1, sender);
+        p.setString(2, receiver);
+        p.setInt(3, MessageType); 
+        p.setString(4, content);
+        p.execute();
+        p.close();
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+}
+     public List<Model_Receive_Message> getChatHistory(int senderID, int receiverID) throws SQLException {
+    List<Model_Receive_Message> history = new ArrayList<>();
+    PreparedStatement p = con.prepareStatement("SELECT sender, receiver, message_type, content FROM messages WHERE sender = ? OR receiver = ?");
+    p.setInt(1, senderID);
+    p.setInt(2, receiverID);
+    ResultSet r = p.executeQuery();
+    while (r.next()) {
+        int messageType = r.getInt("message_Type");
+        int fromUserID = r.getInt("sender");
+        String content = r.getString("content");
+        // Assuming Model_Receive_Message constructor or factory method is available
+        Model_Receive_Message message = new Model_Receive_Message(messageType, fromUserID, content, null);
+        history.add(message);
+    }
+    r.close();
+    p.close();
+    return history;
+}
+
 
     
 
@@ -159,6 +194,8 @@ public class ServiceFIle {
     private final String UPDATE_BLUR_HASH_DONE = "update files set BlurHash=?, `Status`='1' where FileID=? limit 1";
     private final String UPDATE_DONE = "update files set `Status`='1' where FileID=? limit 1";
     private final String GET_FILE_EXTENSION = "select FileExtension from files where FileID=? limit 1";
+    private final String INSERTMESSAGE ="INSERT INTO messages (sender, receiver, message_Type, content) VALUES (?, ?, ?, ?)";
+
     //  Instance
     private final Connection con;
     private final Map<Integer, Model_File_Receiver> fileReceivers;
